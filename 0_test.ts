@@ -1,56 +1,87 @@
-import { AxelarAssetTransfer, AxelarQueryAPI, Environment, CHAINS, AxelarGMPRecoveryAPI, GMPStatusResponse } from "@axelar-network/axelarjs-sdk";
+import {
+  AxelarAssetTransfer,
+  AxelarQueryAPI,
+  Environment,
+  CHAINS,
+  AxelarGMPRecoveryAPI,
+  GMPStatusResponse,
+} from "@axelar-network/axelarjs-sdk";
+import { Secp256k1HdWallet } from "@cosmjs/amino/build/secp256k1hdwallet";
 
-import { SigningCosmWasmClient, Secp256k1HdWallet, GasPrice } from "cosmwasm";
+import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
+import { DirectSecp256k1HdWallet, OfflineSigner } from "@cosmjs/proto-signing";
 
-
+require("dotenv").config();
 
 const osmoRpc = "https://rpc-test.osmosis.zone";
 
 const axelarAssetTransfer = new AxelarAssetTransfer({
-    environment: Environment.TESTNET,
-    auth: "metamask"
+  environment: Environment.TESTNET,
+  auth: "metamask",
 });
 const axelarQuery = new AxelarQueryAPI({
-    environment: Environment.TESTNET,
+  environment: Environment.TESTNET,
 });
 
 const recoveryApi = new AxelarGMPRecoveryAPI({
-    environment: Environment.TESTNET,
+  environment: Environment.TESTNET,
 });
 
-const mnemonic = "";
-
-
-async function setupClient(mnemonic: string, rpc: string, gas: string | undefined): Promise<SigningCosmWasmClient> {
-    if (gas === undefined) {
-        let wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix: 'osmo' });
-        let client = await SigningCosmWasmClient.connectWithSigner(rpc, wallet);
-
-        return client;
-    } else {
-        let gas_price = GasPrice.fromString(gas);
-        let wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix: 'osmo' });
-        let client = await SigningCosmWasmClient.connectWithSigner(rpc, wallet, { gasPrice: gas_price });
-        return client;
+export async function getWalletAddr(prefix: string): Promise<OfflineSigner> {
+  const mnemonic =
+    "notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius";
+  const wallet = await DirectSecp256k1HdWallet.fromMnemonic(
+    mnemonic as string,
+    {
+      prefix,
     }
+  );
+
+  return wallet;
 }
 
-async function getAddress(mnemonic: string, prefix: string = 'osmo') {
-    let wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix });
-    let accounts = await wallet.getAccounts();
-    return accounts[0].address;
+export async function getClient(wallet: OfflineSigner) {
+  const client = await SigningCosmWasmClient.connectWithSigner(osmoRpc, wallet);
+
+  return client;
 }
 
+// Generate Wallet
+// const otherMethod = await Secp256k1HdWallet.generate(12);
+//     console.log(otherMethod);
 
-describe("Axelar-js tests", () => {
-    xit("Generate Wallet", async () => {
-        let wallet = await Secp256k1HdWallet.generate(12);
-        console.log(wallet.mnemonic);
-    });
+(async () => {
+  try {
+    const wallet = await getWalletAddr("osmo");
 
-    xit("gets deposit address", async () => {
-        let address = await getAddress(mnemonic);
-        
-    });
+    const [firstAccount] = await wallet.getAccounts();
+    console.log("firstAccount", firstAccount.address);
 
-});
+    // Generate a deposit address on src chain -> all tokens send to this address will be redirected to provided destination addresS
+    let res = await axelarAssetTransfer.getDepositAddress(
+      CHAINS.TESTNET.POLYGON,
+      CHAINS.TESTNET.OSMOSIS,
+      firstAccount.address,
+      "uausdc"
+    );
+
+    console.log(`destination addr is ${res}`);
+
+    // estimate fee when sending 1 uausdc
+    const fee = await axelarQuery.getTransferFee(
+      CHAINS.TESTNET.OSMOSIS,
+      CHAINS.TESTNET.AVALANCHE,
+      "uausdc",
+      1000000
+    );
+
+    console.log({ fee });
+
+    // What does the api offer cf docs for endpoints https://docs.axelar.network/axelar-core/axelar-core-api.html
+    // axelarAssetTransfer.api.execRest("GET", "/deposit/validate", {});
+  } catch (e) {
+    console.log(e);
+  } finally {
+    return;
+  }
+})();
