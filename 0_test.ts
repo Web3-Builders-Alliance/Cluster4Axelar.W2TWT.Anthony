@@ -70,12 +70,40 @@ export async function getClient(wallet: OfflineSigner) {
     // estimate fee when sending 1 uausdc
     const fee = await axelarQuery.getTransferFee(
       CHAINS.TESTNET.OSMOSIS,
-      CHAINS.TESTNET.AVALANCHE,
+      CHAINS.TESTNET.POLYGON,
       "uausdc",
       1000000
     );
 
+    // axelarQuery.
+
     console.log({ fee });
+
+    //
+    const txHashMumbai: string =
+      "0xdadf088d6e83bb25ad108ee8c2f1edcca5a7ae94729e1f5e0280cee89178e6c5"; // mumbai hash
+
+    const txHash: string =
+      "0xdadf088d6e83bb25ad108ee8c2f1edcca5a7ae94729e1f5e0280cee89178e6c5"; // axelar hash
+
+    const txStatusMumbai: GMPStatusResponse =
+      await recoveryApi.queryTransactionStatus(txHashMumbai);
+    const txStatus: GMPStatusResponse =
+      await recoveryApi.queryTransactionStatus(txHash);
+
+    const responseMumbai = await recoveryApi.manualRelayToDestChain(
+      txHashMumbai
+    );
+    const response = await recoveryApi.manualRelayToDestChain(txHash);
+
+    console.log({ response, responseMumbai });
+
+    const isExecutedMumbai = await recoveryApi.isExecuted(txHashMumbai);
+    const isExecuted = await recoveryApi.isExecuted(txHash);
+
+    console.log({ isExecuted, isExecutedMumbai, txStatus, txStatusMumbai });
+
+    // cf https://testnet.axelarscan.io/transfer/0xdadf088d6e83bb25ad108ee8c2f1edcca5a7ae94729e1f5e0280cee89178e6c5
 
     // What does the api offer cf docs for endpoints https://docs.axelar.network/axelar-core/axelar-core-api.html
     // axelarAssetTransfer.api.execRest("GET", "/deposit/validate", {});
